@@ -1,0 +1,14 @@
+From: Microsoft account team <account-security@microsoft-verify.help>
+Reply-To: support@microsoft-verify.help
+Return-Path: bounce@microsoft-verify.help
+To: staff@company.com
+Subject: [Action Required] Unusual sign-in activity on your Microsoft 365 account
+Authentication-Results: mx.company.com; spf=softfail smtp.mailfrom=microsoft-verify.help; dkim=fail; dmarc=fail
+Content-Type: text/html
+
+<html><body>
+<p>We detected a sign-in attempt from a new device (Moscow, RU).</p>
+<p>If this wasn't you, secure your account now:</p>
+<p><a href="http://localhost:9000/o365">https://login.microsoftonline.com/secure</a></p>
+<p>Microsoft 365 Security</p>
+</body></html>

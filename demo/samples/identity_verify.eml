@@ -1,0 +1,14 @@
+From: Payments Support <no-reply@securepay-refunds.com>
+Reply-To: refunds@securepay-refunds.com
+Return-Path: bounce@securepay-refunds.com
+To: customer@company.com
+Subject: Your refund of $248.90 is pending verification
+Authentication-Results: mx.company.com; spf=fail smtp.mailfrom=securepay-refunds.com; dkim=none; dmarc=fail
+Content-Type: text/html
+
+<html><body>
+<p>Good news — a refund of $248.90 is waiting for you.</p>
+<p>To release the funds, verify your identity and payment details:</p>
+<p><a href="http://localhost:9000/verify">https://secure.paypal.com/refund</a></p>
+<p>Payments Support Team</p>
+</body></html>

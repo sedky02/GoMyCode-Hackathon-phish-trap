@@ -1,0 +1,10 @@
+From: Rewards <promo@shop-rewards.co>
+To: shopper@company.com
+Subject: You've been selected for a $500 gift card
+Authentication-Results: mx.company.com; spf=pass smtp.mailfrom=shop-rewards.co; dkim=pass; dmarc=pass
+Content-Type: text/html
+
+<html><body>
+<p>Congratulations! Click below to claim your reward.</p>
+<p><a href="http://localhost:9000/gift">Claim your $500 gift card</a></p>
+</body></html>
