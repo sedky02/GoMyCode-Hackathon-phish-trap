@@ -21,6 +21,8 @@ th{color:#8b96a8;font-weight:600}
 textarea{width:100%;box-sizing:border-box;min-height:120px;background:#0b0e14;color:#e6e6e6;
   border:1px solid #2a3342;border-radius:8px;padding:10px;font-family:ui-monospace,monospace;font-size:13px}
 button{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer}
+button.sample{background:#1e2530;color:#cbd5e1;padding:7px 12px;font-weight:500;font-size:13px}
+button.sample:hover{background:#2a3342}
 img{max-width:100%;border-radius:8px;border:1px solid #1e2530}
 pre{white-space:pre-wrap;background:#0b0e14;padding:12px;border-radius:8px;overflow:auto;font-size:13px}
 .flag{color:#fca5a5}.muted{color:#8b96a8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -37,7 +39,13 @@ def chip(status: str) -> str:
     return f'<span class=chip style="background:{STATUS_COLORS.get(status,"#555")}">{e(status)}</span>'
 
 
-def render_index(cases: list[dict]) -> str:
+def render_index(cases: list[dict], samples: list[dict] | None = None) -> str:
+    import json as _json
+    samples = samples or []
+    sample_btns = "".join(
+        f"<button type=button class=sample data-i={i}>📧 {e(s['name'])}</button>" for i, s in enumerate(samples)
+    )
+    samples_json = _json.dumps([s["content"] for s in samples])
     rows = "".join(
         f"<tr><td><a href='/cases/{c['id']}'>#{c['id']}</a></td>"
         f"<td>{chip(c['status'])}</td>"
@@ -52,12 +60,22 @@ def render_index(cases: list[dict]) -> str:
       <form id=f>
         <label>Paste a suspicious email (raw .eml or just the body with a link):</label>
         <textarea name=raw_email placeholder="From: ...\nSubject: ...\n\nClick here: https://..."></textarea>
-        <div style="margin-top:10px"><button type=submit>Analyze &amp; trap</button></div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type=submit>Analyze &amp; trap</button>
+          <span class=muted style="margin-left:6px">or load a sample:</span>
+          {sample_btns}
+        </div>
+        <p class=muted style="margin-top:8px;font-size:13px">Tip: start the fake site with
+          <code>python demo/fake_phish_site.py</code> so the sample links resolve.</p>
       </form>
     </div>
     <table><thead><tr><th>Case</th><th>Status</th><th>Subject</th><th>Sender</th><th>Brand</th><th>Hits</th></tr></thead>
     <tbody id=rows>{rows}</tbody></table>
     <script>
+    const SAMPLES={samples_json};
+    document.querySelectorAll('.sample').forEach(b=>b.onclick=()=>{{
+      f.raw_email.value=SAMPLES[+b.dataset.i]; f.raw_email.focus();
+    }});
     f.onsubmit=async ev=>{{ev.preventDefault();
       const r=await fetch('/cases',{{method:'POST',body:new FormData(f)}});
       const j=await r.json(); location.href='/cases/'+j.id;}};

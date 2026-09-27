@@ -5,15 +5,31 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                PlainTextResponse, StreamingResponse)
 
 from . import db, events, ingest, jobs, report
-from .config import SHOTS_DIR
+from .config import ROOT, SHOTS_DIR
 from .templates import render_case, render_index
 
 app = FastAPI(title="PhishTrap")
 
+SAMPLES_DIR = ROOT / "demo" / "samples"
+
+
+def _load_samples() -> list[dict]:
+    items = []
+    for path in sorted(SAMPLES_DIR.glob("*.eml")):
+        raw = path.read_text()
+        subject = next((l[9:].strip() for l in raw.splitlines() if l.lower().startswith("subject:")), path.stem)
+        items.append({"name": path.stem, "subject": subject, "content": raw})
+    return items
+
+
+@app.get("/samples")
+def samples():
+    return JSONResponse(_load_samples())
+
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return render_index(db.list_cases())
+    return render_index(db.list_cases(), _load_samples())
 
 
 @app.post("/cases")
