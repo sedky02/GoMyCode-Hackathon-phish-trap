@@ -103,4 +103,7 @@ def parse_email(raw: bytes) -> dict:
         "attachments": attachments,
         "body_preview": ("\n".join(text_parts) or re.sub(r"<[^>]+>", " ", "\n".join(html_parts)))[:1500],
         "flags": flags,
+        "raw": raw.decode(errors="replace"),
+        "html": "\n".join(html_parts),
+        "text": "\n".join(text_parts),
     }

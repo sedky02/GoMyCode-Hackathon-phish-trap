@@ -32,6 +32,17 @@ def index():
     return render_index(db.list_cases(), _load_samples())
 
 
+@app.post("/preview")
+async def preview(raw_email: str = Form("")):
+    em = ingest.parse_email(raw_email.encode())
+    return JSONResponse({
+        "subject": em.get("subject"), "from": em.get("from"),
+        "reply_to": em.get("reply_to"), "return_path": em.get("return_path"),
+        "flags": em.get("flags", []), "links": em.get("links", []),
+        "html": em.get("html"), "text": em.get("text"), "raw": em.get("raw"),
+    })
+
+
 @app.post("/cases")
 async def create_case(raw_email: str = Form(""), eml: UploadFile | None = None):
     data = await eml.read() if eml is not None else raw_email.encode()

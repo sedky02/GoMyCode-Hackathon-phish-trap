@@ -28,6 +28,10 @@ pre{white-space:pre-wrap;background:#0b0e14;padding:12px;border-radius:8px;overf
 .flag{color:#fca5a5}.muted{color:#8b96a8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:760px){.grid{grid-template-columns:1fr}}
 .hit{animation:flash 1s}@keyframes flash{from{background:#7f1d1d}to{background:transparent}}
+.tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid #1e2530}
+.tab{background:none;color:#8b96a8;padding:8px 14px;border-radius:8px 8px 0 0;font-size:14px}
+.tab.active{color:#fff;background:#1e2530}
+.emailframe{width:100%;height:340px;border:1px solid #1e2530;border-radius:8px;background:#fff}
 </style></head><body>
 <header><h1>🎣 PhishTrap</h1><span class=muted>agentic phishing sandbox &amp; canary tracker</span></header>
 <div class=wrap>"""
@@ -69,13 +73,49 @@ def render_index(cases: list[dict], samples: list[dict] | None = None) -> str:
           <code>python demo/fake_phish_site.py</code> so the sample links resolve.</p>
       </form>
     </div>
+    <div class=card id=preview hidden>
+      <div class=tabs>
+        <button type=button class="tab active" data-t=rendered>📨 Rendered</button>
+        <button type=button class="tab" data-t=source>&lt;/&gt; Source (.eml)</button>
+      </div>
+      <table id=pmeta style="margin:0 0 10px"></table>
+      <div class=pane data-p=rendered>
+        <iframe class=emailframe sandbox id=pframe></iframe>
+        <p class=muted style="font-size:12px;margin-top:6px">Sandboxed preview — scripts &amp; navigation disabled.</p>
+      </div>
+      <div class=pane data-p=source hidden><pre id=psrc></pre></div>
+      <div id=pflags style="margin-top:10px"></div>
+    </div>
     <table><thead><tr><th>Case</th><th>Status</th><th>Subject</th><th>Sender</th><th>Brand</th><th>Hits</th></tr></thead>
     <tbody id=rows>{rows}</tbody></table>
     <script>
     const SAMPLES={samples_json};
-    document.querySelectorAll('.sample').forEach(b=>b.onclick=()=>{{
-      f.raw_email.value=SAMPLES[+b.dataset.i]; f.raw_email.focus();
+    const esc=s=>(s||'').replace(/[&<>"]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}}[c]));
+    async function updatePreview(){{
+      const raw=f.raw_email.value.trim();
+      const box=document.getElementById('preview');
+      if(!raw){{box.hidden=true;return;}}
+      const fd=new FormData();fd.append('raw_email',raw);
+      const j=await (await fetch('/preview',{{method:'POST',body:fd}})).json();
+      box.hidden=false;
+      const row=(k,v)=>v?`<tr><td class=muted style='width:120px'>${{k}}</td><td>${{esc(v)}}</td></tr>`:'';
+      document.getElementById('pmeta').innerHTML=
+        row('From',j.from)+row('Reply-To',j.reply_to)+row('Return-Path',j.return_path)+row('Subject',j.subject);
+      const body=j.html||('<pre style=\"font:14px/1.5 system-ui;white-space:pre-wrap;padding:16px\">'+esc(j.text||'(empty)')+'</pre>');
+      document.getElementById('pframe').srcdoc=
+        '<!doctype html><meta charset=utf-8><base target=_blank><style>body{{margin:0;background:#fff;color:#111}}</style>'+body;
+      document.getElementById('psrc').textContent=j.raw||'';
+      document.getElementById('pflags').innerHTML=
+        (j.flags&&j.flags.length)?'<b class=flag>Red flags:</b><ul>'+j.flags.map(x=>'<li class=flag>'+esc(x)+'</li>').join('')+'</ul>':'';
+    }}
+    document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));
+      document.querySelectorAll('#preview .pane').forEach(p=>p.hidden=p.dataset.p!==t.dataset.t);
     }});
+    document.querySelectorAll('.sample').forEach(b=>b.onclick=()=>{{
+      f.raw_email.value=SAMPLES[+b.dataset.i]; updatePreview();
+    }});
+    let tmr; f.raw_email.oninput=()=>{{clearTimeout(tmr);tmr=setTimeout(updatePreview,400);}};
     f.onsubmit=async ev=>{{ev.preventDefault();
       const r=await fetch('/cases',{{method:'POST',body:new FormData(f)}});
       const j=await r.json(); location.href='/cases/'+j.id;}};
