@@ -108,10 +108,11 @@ def get_case(case_id: int) -> dict | None:
         {**c, "persona": json.loads(c.pop("persona_json"))}
         for c in _query("SELECT * FROM canaries WHERE case_id = ?", (case_id,))
     ]
-    case["hits"] = [
-        {**h, "headers": json.loads(h.pop("headers_json"))}
-        for h in _query("SELECT * FROM hits WHERE case_id = ? ORDER BY id DESC", (case_id,))
-    ]
+    hits = []
+    for h in _query("SELECT * FROM hits WHERE case_id = ? ORDER BY id DESC", (case_id,)):
+        headers = json.loads(h.pop("headers_json"))
+        hits.append({**h, "headers": headers, "geo": headers.get("_geo")})
+    case["hits"] = hits
     return case
 
 

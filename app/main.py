@@ -4,7 +4,7 @@ from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                PlainTextResponse, StreamingResponse)
 
-from . import db, events, ingest, jobs, report
+from . import db, events, geo, ingest, jobs, report
 from .config import ROOT, SHOTS_DIR
 from .templates import render_case, render_index
 
@@ -90,12 +90,13 @@ async def sse():
 async def canary_hit(token: str, request: Request):
     rec = db.find_canary(token)
     case_id = rec["case_id"] if rec else None
-    hit = db.record_hit(
-        token, case_id,
-        ip=request.client.host if request.client else "?",
-        ua=request.headers.get("user-agent", ""),
-        headers=dict(request.headers),
-    )
+    # Prefer X-Forwarded-For (real client behind a proxy / for demo IP spoofing).
+    xff = request.headers.get("x-forwarded-for", "")
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "?")
+    headers = dict(request.headers)
+    headers["_geo"] = geo.lookup(ip)
+    hit = db.record_hit(token, case_id, ip=ip, ua=request.headers.get("user-agent", ""), headers=headers)
+    hit["geo"] = headers["_geo"]
     events.publish("hit", hit)
     # Benign 1x1 response; never reveal it's a trap.
     return PlainTextResponse("ok")

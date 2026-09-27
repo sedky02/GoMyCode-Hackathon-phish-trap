@@ -32,6 +32,15 @@ pre{white-space:pre-wrap;background:#0b0e14;padding:12px;border-radius:8px;overf
 .tab{background:none;color:#8b96a8;padding:8px 14px;border-radius:8px 8px 0 0;font-size:14px}
 .tab.active{color:#fff;background:#1e2530}
 .emailframe{width:100%;height:340px;border:1px solid #1e2530;border-radius:8px;background:#fff}
+.badge{display:inline-block;padding:4px 12px;border-radius:8px;font-weight:700;font-size:13px;color:#fff}
+.rl-critical{background:#dc2626}.rl-high{background:#ea580c}.rl-medium{background:#ca8a04}.rl-low{background:#16a34a}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{position:relative;padding:0 0 18px 30px;border-left:2px solid #2a3342;margin-left:8px}
+.timeline li:last-child{border-left-color:transparent}
+.timeline .dot{position:absolute;left:-11px;top:0;font-size:16px}
+.timeline .t-label{font-weight:600}.timeline .t-detail{color:#8b96a8;font-size:13px;word-break:break-all}
+.timeline .t-ts{color:#5b6577;font-size:12px}
+.mappin{width:100%;height:220px;border:0;border-radius:8px;margin-top:10px}
 </style></head><body>
 <header><h1>🎣 PhishTrap</h1><span class=muted>agentic phishing sandbox &amp; canary tracker</span></header>
 <div class=wrap>"""
@@ -123,17 +132,46 @@ def render_index(cases: list[dict], samples: list[dict] | None = None) -> str:
     </script>""" + _FOOT
 
 
+def _geo_str(h: dict) -> str:
+    g = h.get("geo") or {}
+    parts = [g.get("flag", ""), g.get("city", ""), g.get("country", "")]
+    return e(" ".join(p for p in parts if p).strip()) or "<span class=muted>—</span>"
+
+
+def _map_iframe(hits: list[dict]) -> str:
+    for h in hits:
+        g = h.get("geo") or {}
+        if g.get("lat") is not None and g.get("lon") is not None:
+            lat, lon = g["lat"], g["lon"]
+            d = 4  # bbox half-size in degrees
+            bbox = f"{lon-d},{lat-d},{lon+d},{lat+d}"
+            src = (f"https://www.openstreetmap.org/export/embed.html?bbox={bbox}"
+                   f"&marker={lat},{lon}&layer=mapnik")
+            return f"<iframe class=mappin src='{e(src)}' loading=lazy></iframe>"
+    return ""
+
+
 def render_case(c: dict, abuse: str) -> str:
+    from . import report
     v = c.get("verdict") or {}
     sb = c.get("sandbox") or {}
     email = c.get("email") or {}
+    score, level = report.risk_score(c)
     ioc_rows = "".join(
         f"<tr><td class=muted>{e(i['type'])}</td><td>{e(i['value'])}</td></tr>" for i in c.get("iocs", [])
     ) or "<tr><td colspan=2 class=muted>none</td></tr>"
     hit_rows = "".join(
-        f"<tr class=hit><td>{e(h['ts'])}</td><td>{e(h['ip'] or '')}</td><td class=muted>{e((h['ua'] or '')[:50])}</td></tr>"
+        f"<tr class=hit><td>{e(h['ts'])}</td><td>{e(h['ip'] or '')}</td>"
+        f"<td>{_geo_str(h)}</td><td class=muted>{e((h['ua'] or '')[:40])}</td></tr>"
         for h in c.get("hits", [])
-    ) or "<tr><td colspan=3 class=muted>No canary hits yet. Trigger the planted link to see one appear.</td></tr>"
+    ) or "<tr><td colspan=4 class=muted>No canary hits yet. Trigger the planted link to see one appear.</td></tr>"
+    def _tl(ev: dict) -> str:
+        detail = f"<div class=t-detail>{e(ev['detail'])}</div>" if ev.get("detail") else ""
+        ts = f"<div class=t-ts>{e(ev['ts'])}</div>" if ev.get("ts") else ""
+        return (f"<li><span class=dot>{ev['icon']}</span>"
+                f"<div class=t-label>{e(ev['label'])}</div>{detail}{ts}</li>")
+    timeline_items = "".join(_tl(ev) for ev in report.build_timeline(c))
+    map_html = _map_iframe(c.get("hits", []))
     flags = "".join(f"<li class=flag>{e(fl)}</li>" for fl in email.get("flags", []))
     canaries = "".join(
         f"<li><code>{e(cn['url'])}</code> — decoy identity <b>{e(cn['persona']['full_name'])}</b> / "
@@ -144,7 +182,9 @@ def render_case(c: dict, abuse: str) -> str:
 
     return _HEAD + f"""
     <p><a href='/'>&larr; all cases</a></p>
-    <h2>Case #{c['id']} {chip(c['status'])}</h2>
+    <h2>Case #{c['id']} {chip(c['status'])}
+      <span class="badge rl-{level}" title="Risk score">RISK {score} · {level.upper()}</span></h2>
+    <div class=card><h3>Timeline</h3><ul class=timeline>{timeline_items}</ul></div>
     <div class=grid>
       <div class=card><h3>What the sandbox saw</h3>{shot}
         <p class=muted>Target: {e(c.get('target_url') or '')}<br>Final: {e(c.get('final_url') or '')}
@@ -160,7 +200,9 @@ def render_case(c: dict, abuse: str) -> str:
     <div class=card><h3>Planted canaries (the trap)</h3><ul>{canaries}</ul>
       <p class=muted>If the attacker ever opens the planted link or reuses the decoy password, a hit appears below.</p>
       <h3>🚨 Canary hits</h3>
-      <table id=hits><thead><tr><th>When</th><th>IP</th><th>User-Agent</th></tr></thead><tbody>{hit_rows}</tbody></table>
+      <table id=hits><thead><tr><th>When</th><th>IP</th><th>Location</th><th>User-Agent</th></tr></thead>
+        <tbody>{hit_rows}</tbody></table>
+      {map_html}
     </div>
     <div class=grid>
       <div class=card><h3>Indicators of Compromise</h3>
